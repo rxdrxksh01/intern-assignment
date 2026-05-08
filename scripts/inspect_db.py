@@ -147,7 +147,9 @@ def add_top_countries_sheet(workbook: Workbook, connection: sqlite3.Connection) 
     write_table(sheet, ["country", "title_count"], rows)
 
 
-def add_sarkar_example_sheet(workbook: Workbook, connection: sqlite3.Connection) -> None:
+def add_sarkar_example_sheet(
+    workbook: Workbook, connection: sqlite3.Connection
+) -> None:
     """Add one joined example showing how normalized tables connect."""
     sheet = workbook.create_sheet("Joined Example")
 

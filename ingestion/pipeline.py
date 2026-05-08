@@ -8,7 +8,13 @@ from pathlib import Path
 from ingestion.cleaning import clean_row
 from ingestion.database import write_database
 from ingestion.duplicates import drop_duplicate_content
-from ingestion.models import CSV_PATH, DB_PATH, EXPECTED_COLUMNS, CleanTitle, IngestStats
+from ingestion.models import (
+    CSV_PATH,
+    DB_PATH,
+    EXPECTED_COLUMNS,
+    CleanTitle,
+    IngestStats,
+)
 
 
 def validate_columns(columns: list[str] | None) -> None:

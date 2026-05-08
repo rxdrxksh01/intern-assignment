@@ -6,7 +6,7 @@ import re
 from datetime import datetime
 from typing import Any
 
-from ingestion.models import CleanTitle, IngestStats, UNKNOWN_VALUE, VALID_TYPES
+from ingestion.models import UNKNOWN_VALUE, VALID_TYPES, CleanTitle, IngestStats
 
 DATE_FORMAT = "%B %d, %Y"
 DURATION_RE = re.compile(r"^(?P<value>\d+)\s+(?P<unit>min|Season|Seasons)$")
@@ -14,7 +14,6 @@ RATING_REPLACEMENTS = {
     "NR": "Not Rated",
     "UR": "Unrated",
 }
-
 
 
 def clean_text(value: Any, *, field_name: str, stats: IngestStats) -> str | None:
@@ -47,6 +46,7 @@ def clean_metadata(value: Any, *, field_name: str, stats: IngestStats) -> str:
 
     return cleaned
 
+
 def dedupe_preserve_order(values: list[str]) -> list[str]:
     """Remove duplicate list values while keeping the CSV order."""
     seen: set[str] = set()
@@ -62,6 +62,7 @@ def dedupe_preserve_order(values: list[str]) -> list[str]:
         deduped.append(value)
 
     return deduped
+
 
 def split_list(value: str, *, field_name: str, stats: IngestStats) -> list[str]:
     """Split a comma-separated metadata field into ordered unique values."""
@@ -84,7 +85,6 @@ def split_list(value: str, *, field_name: str, stats: IngestStats) -> list[str]:
     return deduped_values or [UNKNOWN_VALUE]
 
 
-
 def normalize_type(value: Any, stats: IngestStats) -> str | None:
     """Normalize the title type to Movie or TV Show."""
     cleaned = clean_text(value, field_name="type", stats=stats)
@@ -100,6 +100,7 @@ def normalize_type(value: Any, stats: IngestStats) -> str | None:
 
     return normalized
 
+
 def normalize_rating(value: Any, stats: IngestStats) -> str:
     """Clean rating and expand unclear rating abbreviations."""
     rating = clean_metadata(value, field_name="rating", stats=stats)
@@ -109,6 +110,7 @@ def normalize_rating(value: Any, stats: IngestStats) -> str:
         stats.fixes["normalized_rating"] += 1
 
     return normalized_rating
+
 
 def parse_release_year(value: Any, stats: IngestStats) -> int | None:
     """Parse release_year as an integer."""
@@ -163,7 +165,9 @@ def clean_row(row: dict[str, str], stats: IngestStats) -> CleanTitle | None:
     title_type = normalize_type(row.get("type"), stats)
     title = clean_text(row.get("title"), field_name="title", stats=stats)
     release_year = parse_release_year(row.get("release_year"), stats)
-    description = clean_text(row.get("description"), field_name="description", stats=stats)
+    description = clean_text(
+        row.get("description"), field_name="description", stats=stats
+    )
 
     missing_required = {
         "show_id": show_id,
@@ -179,11 +183,15 @@ def clean_row(row: dict[str, str], stats: IngestStats) -> CleanTitle | None:
             stats.dropped_reasons[f"missing_or_invalid_{field_name}"] += 1
             return None
 
-    director_text = clean_metadata(row.get("director"), field_name="director", stats=stats)
+    director_text = clean_metadata(
+        row.get("director"), field_name="director", stats=stats
+    )
     cast_text = clean_metadata(row.get("cast"), field_name="cast", stats=stats)
     country_text = clean_metadata(row.get("country"), field_name="country", stats=stats)
     rating = normalize_rating(row.get("rating"), stats)
-    genre_text = clean_metadata(row.get("listed_in"), field_name="listed_in", stats=stats)
+    genre_text = clean_metadata(
+        row.get("listed_in"), field_name="listed_in", stats=stats
+    )
 
     date_added = parse_date_added(row.get("date_added"), stats)
     duration_value, duration_unit = parse_duration(row.get("duration"), stats)
