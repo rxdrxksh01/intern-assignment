@@ -45,3 +45,23 @@ class StatsResponse(BaseModel):
     total_titles: int
     count_by_type: dict[str, int]
     top_countries: list[CountryCount]
+
+
+class AskRequest(BaseModel):
+    """Request body for the RAG Q&A endpoint."""
+
+    question: str
+
+
+class AskSource(BaseModel):
+    """A source title used by the RAG answer."""
+
+    show_id: str
+    title: str
+
+
+class AskResponse(BaseModel):
+    """Response from the RAG Q&A endpoint."""
+
+    answer: str
+    sources: list[AskSource]
