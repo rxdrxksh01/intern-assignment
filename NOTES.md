@@ -1,165 +1,122 @@
 # NOTES
 
-## 1. CSV problems found
+## 1. CSV problems, fixes, and what I left
 
-The CSV was usable, but it needed cleaning before using it in the API or Q&A system.
+The CSV was usable, but it needed cleaning before using it for search or RAG.
 
-I found these main problems:
-
-- Some text fields had extra whitespace. The biggest issue was in `date_added`, where many values had leading spaces.
-- A few title, description, and cast values had messy whitespace such as non-breaking spaces, newlines, tabs, or repeated spaces.
-- Some `country` values ended with a trailing comma, which created empty values when splitting the field.
-- Several optional metadata fields were missing:
-  - `director`: 1,969 rows
-  - `cast`: 570 rows
-  - `country`: 476 rows
-  - `date_added`: 11 rows
-  - `rating`: 10 rows
-- Multi-value fields were stored as comma-separated strings: `country`, `listed_in`, `cast`, and `director`.
-- `duration` was stored as text, for example `90 min`, `1 Season`, or `3 Seasons`.
+Main problems found:
+- `date_added` had many leading-space issues, so dates needed trimming before parsing.
+- Some text fields had messy whitespace such as newlines, tabs, repeated spaces, and non-breaking spaces.
+- Optional metadata was missing in many rows, especially `director`, `cast`, and `country`.
+- `country`, `cast`, `director`, and `listed_in` were comma-separated multi-value fields.
+- Some country values had trailing commas, which created empty values after splitting.
+- `duration` was stored as text like `90 min`, `1 Season`, or `3 Seasons`.
 - I found one duplicate-content row where all cleaned fields matched another row except `show_id`.
 
-## 2. What I fixed
+Fixes made:
+- Cleaned whitespace in text fields.
+- Parsed `date_added` into `YYYY-MM-DD`.
+- Parsed `release_year` as an integer.
+- Split `duration` into `duration_value` and `duration_unit`.
+- Converted missing user-facing metadata to `"Unknown"` for fields like director, cast, country, and rating.
+- Normalized rating abbreviations: `NR` to `Not Rated` and `UR` to `Unrated`.
+- Split multi-value fields into separate child tables.
+- Removed empty list values and duplicate list values while keeping original order.
+- Dropped only unusable rows or exact duplicate-content rows.
 
-All cleaning happens in code. I did not manually edit `data/netflix_titles.csv`.
+What I left:
+- I did not drop rows just because director, cast, country, rating, or date_added was missing. Those fields are useful but not required to identify a title.
+- I did not manually edit the CSV; all cleaning happens in code.
+- I did not add external data such as IMDb ratings, posters, languages, or current Netflix availability because that would add new dependencies and make the assignment harder to reproduce.
+- I did not try fuzzy duplicate matching. I only removed rows where cleaned content matched exactly except `show_id`.
 
-The ingestion script currently does the following:
+## 2. Schema decisions
 
-- Cleans text by removing extra spaces, non-breaking spaces, newlines, tabs, and repeated whitespace.
-- Converts missing human-facing metadata to `"Unknown"` for:
-  - `director`
-  - `cast`
-  - `country`
-  - `rating`
-  - `listed_in`
-- Keeps missing `date_added` as `NULL` instead of `"Unknown"` because dates should stay sortable and filterable.
-- Parses `date_added` into `YYYY-MM-DD`.
-- Parses `release_year` as an integer.
-- Splits `duration` into:
-  - `duration_value`
-  - `duration_unit`
-- Normalized unclear rating abbreviations: `NR` to `Not Rated` and `UR` to `Unrated`.
-- Splits comma-separated fields into separate child tables.
-- Removes empty list values caused by trailing commas.
-- Removes duplicate values inside list fields while keeping the original order.
-- Drops duplicate-content rows where every cleaned field matches except `show_id`.
+I used SQLite because the dataset is small, local, and easy to rebuild.
 
-## 3. What I left unchanged
+The main table is `titles`. It stores one row per title with fields like `show_id`, `type`, `title`, `release_year`, `rating`, `duration_value`, `duration_unit`, `date_added`, and `description`.
 
-I intentionally did not over-clean the dataset.
+I used `show_id` as the primary key because title names are not guaranteed to be unique.
 
-I left these things unchanged:
-
-- I did not drop rows just because optional metadata was missing.
-- I did not drop duplicate titles generally because titles are not guaranteed to be unique.
-- I did not add external metadata such as IMDb, TMDB, posters, language, or current Netflix availability.
-- I did not scale numeric fields like `release_year` or duration because this is not a tabular ML model.
-- I did not create many boolean quality-flag columns because the ingestion summary already reports the important issues.
-
-## 4. Row dropping decisions
-
-Rows are dropped only when they are not usable for the catalogue.
-
-A row can be dropped for:
-
-- missing `show_id`
-- missing or invalid `type`
-- missing `title`
-- missing or invalid `release_year`
-- missing `description`
-- duplicate `show_id`
-- duplicate full content except `show_id`
-
-Rows are not dropped for missing:
-
-- `director`
-- `cast`
-- `country`
-- `rating`
-- `date_added`
-
-I kept those rows because missing optional metadata does not make a Netflix title unusable.
-
-## 5. Missing value decisions
-
-I used `"Unknown"` for missing human-facing metadata because it is clearer in API responses than returning empty values.
-
-For example:
-
-- missing director becomes `"Unknown"`
-- missing cast becomes `"Unknown"`
-- missing country becomes `"Unknown"`
-- missing rating becomes `"Unknown"`
-
-I did not use `"Unknown"` for dates or numeric fields.
-
-For example:
-
-- missing `date_added` stays `NULL`
-- missing or invalid `duration` becomes `NULL` for `duration_value` and `duration_unit`
-
-This keeps date and numeric fields easier to filter, sort, and query.
-
-## 6. Schema decisions
-
-I used SQLite because the dataset is small, local, and easy to reproduce.
-
-The main table is:
-
-- `titles`
-
-It stores one row per Netflix title:
-
-- `show_id`
-- `type`
-- `title`
-- `release_year`
-- `rating`
-- `duration_value`
-- `duration_unit`
-- `date_added`
-- `description`
-
-I used `show_id` as the primary key because titles are not unique.
-
-For multi-value fields, I created separate child tables:
+For multi-value fields, I created child tables:
 
 - `title_countries`
 - `title_genres`
 - `title_cast`
 - `title_directors`
 
-I chose this because fields like `country`, `cast`, `director`, and `listed_in` can contain multiple comma-separated values.
-
-For example, a title with `United States, India` should be stored as two country rows, not one raw string. This makes country filtering and country stats more accurate.
+I did this because fields like `country`, `cast`, `director`, and `listed_in` can contain multiple values in one CSV cell. Storing them in child tables makes filtering and stats cleaner. For example, a title with `United States, India` should count under both countries.
 
 Each child table also has a `position` column. This preserves the original order from the CSV, which is useful for fields like cast and directors.
 
-## 7. Current ingestion result
+## 3. RAG choices
 
-Running `python ingest.py` currently gives:
+I used one RAG document per Netflix title. I did not chunk further because each title row is already short.
 
-- Rows read: 6,234
-- Rows loaded: 6,233
-- Rows dropped: 1
+For each title, I embedded a text block containing:
 
-The dropped row was a duplicate-content row where all cleaned fields matched another row except `show_id`.
+- title
+- type
+- release year
+- rating
+- duration
+- countries
+- genres
+- directors
+- cast
+- description
 
-The cleaned database is written to `data/netflix.db`.
+I included metadata, not only description, because users may ask questions like “Indian comedy movie”, “TV-MA Japanese show”, or “movie with Vijay”. Those answers depend on country, genre, rating, cast, and type.
 
-The database contains these tables:
+I used:
 
-- `titles`
-- `title_countries`
-- `title_genres`
-- `title_cast`
-- `title_directors`
+- Embedding model: `sentence-transformers/all-MiniLM-L6-v2`
+- Vector store: Chroma
+- LLM: Groq with `llama-3.3-70b-versatile`
 
-## 8. Current limitations of ingestion
+I chose Chroma instead of only numpy because it stores documents, embeddings, ids, and metadata together. I did not use a heavier framework like LangChain because the project is small and I wanted the retrieval flow to stay easy to explain.
 
-The ingestion is good enough for the first part of the assignment, but it still has some limitations:
+The `/ask` endpoint retrieves relevant titles, sends them to Groq with guardrails, and returns the answer plus only the `show_id`s the LLM says it actually used. The prompt asks the model to use only catalogue sources and return JSON with `answer` and `used_show_ids`.
 
-- `"Unknown"` is useful for display, but it means missing metadata is now mixed with normal values in the child tables.
-- Duplicate detection only removes rows with identical cleaned content except `show_id`; it does not detect near-duplicates.
-- The dataset is a historical Netflix snapshot and should not be treated as the current Netflix catalogue.
-- The original CSV has limited metadata, so questions about language, IMDb rating, posters, or current availability cannot be answered from this data alone.
+## 4. What would break at 100,000 titles?
+
+At 100,000 titles, the current design would still work conceptually, but several parts would need improvement:
+
+- API list responses would need stronger pagination and possibly more indexes.
+- The current API fetches child-table values title by title, which is simple but creates many queries per page. At larger scale I would batch-fetch child values using `WHERE show_id IN (...)`.
+- Rebuilding the full Chroma index every time would become slow. I would make indexing incremental and only re-embed changed rows.
+- RAG quality would need evaluation. I would add a small test set of questions and expected source titles.
+- Local Chroma storage may be enough for development, but for production I would consider a managed vector store or a more controlled indexing pipeline.
+- LLM cost and latency would matter more. I would cache common answers and reduce context size more carefully.
+
+## 5. AI usage
+
+I used AI tools while building this project.
+
+I used AI for:
+- planning the ingestion structure
+- drafting some first versions of helper functions
+- discussing cleaning choices like `Unknown` vs `NULL`
+- comparing SQLite schema options for multi-value fields
+- drafting API and RAG route structure
+- reviewing prompts and source-grounding behavior
+- checking whether code looked over-engineered
+
+I did not accept everything blindly. I rejected or changed suggestions that felt too generic or too heavy, including:
+- MinMax scaling numeric fields
+- many boolean data-quality columns
+- full rating whitelists
+- putting RAG search text into ingestion
+- returning all retrieved RAG sources even when the LLM did not use them
+
+I changed AI-generated output in multiple places instead of accepting it blindly. One example was the RAG prompt and source handling. The first version returned all retrieved titles as sources, even when the answer only used some of them. I changed the prompt to require a JSON response with `answer` and `used_show_ids`, added guardrails against outside knowledge and invented metadata, and updated the API to return only the titles listed in `used_show_ids`. This made the `/ask` response more honest because the returned sources now match the answer.
+
+I also ran the code, checked outputs, and adjusted decisions based on actual behavior. I would be able to explain the final code path from CSV to SQLite, from SQLite to API, and from Chroma retrieval to Groq answer.
+
+## 6. What I would do with another 4 hours
+
+With another 4 hours, I would improve:
+
+- Add IMDb/TMDB metadata such as IMDb rating, poster URL, language, and maybe runtime validation, but only as a separate enrichment step so the original CSV pipeline stays reproducible.
+- Add a fallback for `/ask` when Groq fails, such as returning the retrieved titles with a clear message instead of a 500 error.
+
