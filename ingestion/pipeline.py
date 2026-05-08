@@ -1,4 +1,3 @@
-cat > ingestion/pipeline.py <<'PY'
 """End-to-end ingestion pipeline for the Netflix catalogue."""
 
 from __future__ import annotations
@@ -92,4 +91,3 @@ def run_ingestion(csv_path: Path = CSV_PATH, db_path: Path = DB_PATH) -> None:
     titles, stats = load_clean_titles(csv_path)
     write_database(titles, db_path)
     print_summary(stats, db_path)
-PY
