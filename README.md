@@ -1,12 +1,12 @@
 # Netflix Catalog Q&A System
 
-This project is a backend system for searching and asking questions about a Netflix catalogue dataset.
+This project is a small backend system for searching and asking questions about a Netflix catalogue dataset.
 
 It has three main parts:
 
-1. Ingestion: cleans the raw Netflix CSV and stores it in SQLite.
-2. Structured API: provides endpoints to browse titles, filter titles, fetch one title, and view stats.
-3. RAG Q&A: retrieves relevant catalogue titles from Chroma and uses Groq to answer questions with source `show_id`s.
+1. **Data ingestion** — cleans the raw Netflix CSV and stores it in SQLite.
+2. **Structured API** — provides FastAPI endpoints for title search, title lookup, and catalogue stats.
+3. **RAG Q&A** — retrieves relevant catalogue titles from Chroma and uses Groq to answer questions with source `show_id`s.
 
 The source dataset is:
 
@@ -14,7 +14,7 @@ The source dataset is:
 data/netflix_titles.csv
 ```
 
-Generated files like the SQLite database and Chroma vector index are not committed because they can be rebuilt locally.
+Generated files such as `data/netflix.db`, `data/chroma_db/`, `.env`, and `.venv/` are not committed because they can be rebuilt locally.
 
 ---
 
@@ -28,42 +28,7 @@ Generated files like the SQLite database and Chroma vector index are not committ
 - Groq
 - pytest
 - ruff
-
----
-
-## Project Structure
-
-```text
-.
-├── ingest.py
-├── ingestion/
-│   ├── cleaning.py
-│   ├── database.py
-│   ├── duplicates.py
-│   ├── models.py
-│   └── pipeline.py
-├── api/
-│   ├── ask.py
-│   ├── database.py
-│   ├── main.py
-│   ├── schemas.py
-│   └── titles.py
-├── rag/
-│   ├── config.py
-│   ├── documents.py
-│   ├── index.py
-│   ├── llm.py
-│   ├── retriever.py
-│   └── service.py
-├── tests/
-│   ├── test_api.py
-│   └── test_ingestion.py
-├── data/
-│   └── netflix_titles.csv
-├── NOTES.md
-├── requirements.txt
-└── README.md
-```
+- Optional demo UI: Streamlit
 
 ---
 
@@ -76,118 +41,67 @@ git clone <your-repo-url>
 cd intern-assignment
 ```
 
-Create a virtual environment:
+Create and activate a virtual environment:
 
 ```bash
 python3 -m venv .venv
-```
-
-Activate the virtual environment:
-
-```bash
 source .venv/bin/activate
 ```
 
-Install dependencies:
+Install backend dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
----
-
-## Environment Variables
-
-Create a local `.env` file:
+Create a local environment file:
 
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and add your Groq API key:
+Add your Groq key in `.env`:
 
 ```env
 GROQ_API_KEY=your_groq_api_key_here
 GROQ_MODEL=llama-3.3-70b-versatile
 ```
 
-The Groq API key is required for the `/ask` endpoint.
-
 Do not commit `.env`.
 
 ---
 
-## Run Data Ingestion
+## How to Run
 
-Run this command from the project root:
+### 1. Run ingestion
 
 ```bash
 python ingest.py
 ```
 
-This reads:
-
-```text
-data/netflix_titles.csv
-```
-
-and creates:
+This reads the raw CSV and creates:
 
 ```text
 data/netflix.db
 ```
 
-The ingestion script prints a summary report with:
+The script prints a summary report with rows read, rows loaded, rows dropped, missing values handled, and cleaning fixes applied.
 
-- rows read
-- rows loaded
-- rows dropped
-- missing values handled
-- cleaning fixes applied
-
-Example output:
-
-```text
-Ingestion complete
-------------------
-Database written: data/netflix.db
-Rows read:        6234
-Rows loaded:      6233
-Rows dropped:     1
-```
-
-The generated SQLite database is ignored by Git because it can be rebuilt.
-
----
-
-## Build the RAG Index
-
-After ingestion, build the local Chroma vector index:
+### 2. Build the RAG index
 
 ```bash
 python -m rag.index
 ```
 
-This reads the cleaned SQLite database, builds one searchable document per title, embeds each document using `sentence-transformers/all-MiniLM-L6-v2`, and stores the vectors in:
+This creates the local Chroma vector index:
 
 ```text
 data/chroma_db/
 ```
 
-The Chroma index is ignored by Git because it can be rebuilt.
+The index stores one embedded document per Netflix title.
 
-If the CSV or database changes, rerun:
-
-```bash
-python ingest.py
-python -m rag.index
-```
-
----
-
-## Run the API Server
-
-Start the FastAPI server:
+### 3. Start the API
 
 ```bash
 uvicorn api.main:app --reload
@@ -199,7 +113,7 @@ The API runs at:
 http://127.0.0.1:8000
 ```
 
-Interactive API docs are available at:
+Interactive docs are available at:
 
 ```text
 http://127.0.0.1:8000/docs
@@ -209,27 +123,19 @@ http://127.0.0.1:8000/docs
 
 ## API Endpoints
 
-### Health Check
+### Health check
 
 ```bash
 curl http://127.0.0.1:8000/health
 ```
 
-Example response:
-
-```json
-{"status":"ok"}
-```
-
----
-
-### List Titles
+### List titles
 
 ```bash
-curl "http://127.0.0.1:8000/titles?page=1&page_size=5"
+curl "http://127.0.0.1:8000/titles?country=India&type=Movie&page=1&page_size=5"
 ```
 
-Supported query filters:
+Supported filters:
 
 - `country`
 - `release_year`
@@ -238,41 +144,21 @@ Supported query filters:
 - `page`
 - `page_size`
 
-Example:
-
-```bash
-curl "http://127.0.0.1:8000/titles?country=India&type=Movie&page=1&page_size=5"
-```
-
-This returns paginated title results with countries, genres, cast, and directors.
-
----
-
-### Get One Title
+### Get one title by ID
 
 ```bash
 curl http://127.0.0.1:8000/titles/81075235
 ```
 
-This returns one title by `show_id`.
-
----
-
-### Catalogue Stats
+### Stats
 
 ```bash
 curl http://127.0.0.1:8000/stats
 ```
 
-This returns:
+Returns total titles, count by type, and top 10 countries.
 
-- total title count
-- count by type
-- top countries
-
----
-
-### Ask a Question
+### Ask a question
 
 ```bash
 curl -X POST http://127.0.0.1:8000/ask \
@@ -280,74 +166,94 @@ curl -X POST http://127.0.0.1:8000/ask \
   -d '{"question":"Suggest me an Indian comedy movie"}'
 ```
 
-The `/ask` endpoint:
-
-1. embeds the user question
-2. retrieves relevant titles from Chroma
-3. sends the retrieved titles to Groq with a grounded prompt
-4. returns an answer plus the source titles used
-
-Example response:
-
-```json
-{
-  "answer": "Good matches are Brahman Naman, Time Please, 15-Aug, and Rajnigandha. They are all Indian movies listed under Comedies, so they fit your request.",
-  "sources": [
-    {
-      "show_id": "80097355",
-      "title": "Brahman Naman"
-    },
-    {
-      "show_id": "80201815",
-      "title": "Time Please"
-    },
-    {
-      "show_id": "81033429",
-      "title": "15-Aug"
-    },
-    {
-      "show_id": "81213896",
-      "title": "Rajnigandha"
-    }
-  ]
-}
-```
+The `/ask` endpoint embeds the question, retrieves relevant titles from Chroma, sends the retrieved context to Groq, and returns an answer plus the source titles used.
 
 ---
 
-## Run Tests
+## Optional Streamlit Demo
 
-Run the test suite:
+The Streamlit demo is only a thin UI over the FastAPI backend. It does not replace the API.
+
+Install demo dependency:
+
+```bash
+pip install -r requirements-demo.txt
+```
+
+Start the backend first:
+
+```bash
+python ingest.py
+python -m rag.index
+uvicorn api.main:app --reload
+```
+
+Then run:
+
+```bash
+streamlit run demo/streamlit_app.py
+```
+
+The Streamlit sidebar lets you set the API base URL. For local use, keep:
+
+```text
+http://127.0.0.1:8000
+```
+
+For deployed use, paste the Render backend URL.
+
+---
+
+## Deployment Notes
+
+For Render backend deployment, use:
+
+```bash
+pip install -r requirements.txt && python ingest.py && python -m rag.index
+```
+
+as the build command, and:
+
+```bash
+python -m uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-10000}
+```
+
+as the start command.
+
+Set these environment variables on Render:
+
+```env
+GROQ_API_KEY=your_groq_api_key_here
+GROQ_MODEL=llama-3.3-70b-versatile
+PYTHON_VERSION=3.11.11
+```
+
+The RAG dependencies are lazy-loaded so the API can start quickly. The first `/ask` request after a restart can be slower because it loads the embedding model and Chroma retriever into memory.
+
+---
+
+## How to Test
+
+Run the tests:
 
 ```bash
 python -m pytest -q
 ```
 
-The tests cover important behavior such as:
-
-- dropping unusable ingestion rows
-- parsing metadata fields
-- duplicate-content handling
-- structured filtering
-- 404 handling
-- `/ask` returning an answer with sources
-
----
-
-## Linting
-
-Run ruff:
+Run linting:
 
 ```bash
 ruff check .
 ```
 
-To auto-fix import sorting and formatting issues:
+To fix import sorting or formatting issues:
 
 ```bash
 ruff check --select I --fix .
 ruff format .
 ```
+
+The test suite covers ingestion row dropping, metadata parsing, duplicate-content handling, filtered title listing, missing title errors, and `/ask` source output.
 
 ---
 
@@ -367,9 +273,12 @@ __pycache__/
 
 ---
 
-## Known Points
+## Known Limitations
 
-
-- Missing human-facing metadata is stored as `"Unknown"`, which is useful for display but means missing values are mixed with normal metadata values.
+- The dataset is a 2019 Netflix snapshot, so it should not be treated as current Netflix availability.
+- Missing human-facing metadata is stored as `"Unknown"`, which is useful for display but mixes missing values with normal metadata values.
 - The Chroma index must be rebuilt with `python -m rag.index` after changing the database.
-- Retrieval uses one document per title. This works for this dataset size, but a much larger catalogue would need more optimized indexing and evaluation.
+- The `/ask` endpoint depends on a valid Groq API key.
+- The first `/ask` request after server restart can be slower because the RAG model is loaded lazily.
+- Retrieval uses one document per title. This is fine for this dataset size, but a much larger catalogue would need better indexing, caching, and evaluation.
+- The system answers only from the provided catalogue data. It cannot answer questions about IMDb ratings, posters, trailers, current Netflix availability, or languages unless that information exists in the dataset.
