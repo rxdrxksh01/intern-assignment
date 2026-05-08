@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import os
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-CSV_PATH = Path("data/netflix_titles.csv")
-DB_PATH = Path("data/netflix.db")
+CSV_PATH = Path(os.environ.get("NETFLIX_CSV_PATH", "data/netflix_titles.csv"))
+DB_PATH = Path(os.environ.get("NETFLIX_DB_PATH", "data/netflix.db"))
 UNKNOWN_VALUE = "Unknown"
 VALID_TYPES = {"Movie", "TV Show"}
 
@@ -40,7 +41,7 @@ class IngestStats:
     anomalies: Counter[str] = field(default_factory=Counter)
 
 
-@dataclass(frozen=True)
+@dataclass
 class CleanTitle:
     """Cleaned title data ready to be inserted into SQLite."""
 
