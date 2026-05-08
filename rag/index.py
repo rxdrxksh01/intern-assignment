@@ -10,7 +10,12 @@ from typing import TypeVar
 import chromadb
 from sentence_transformers import SentenceTransformer
 
-from rag.config import CHROMA_COLLECTION_NAME, CHROMA_PATH, EMBEDDING_MODEL_NAME, RAG_BATCH_SIZE
+from rag.config import (
+    CHROMA_COLLECTION_NAME,
+    CHROMA_PATH,
+    EMBEDDING_MODEL_NAME,
+    RAG_BATCH_SIZE,
+)
 from rag.documents import TitleDocument, load_title_documents
 
 logger = logging.getLogger(__name__)
@@ -29,8 +34,7 @@ def reset_chroma_directory(path: Path) -> None:
 def batched(items: list[T], batch_size: int) -> list[list[T]]:
     """Split a list into fixed-size batches."""
     return [
-        items[index : index + batch_size]
-        for index in range(0, len(items), batch_size)
+        items[index : index + batch_size] for index in range(0, len(items), batch_size)
     ]
 
 
