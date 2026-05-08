@@ -10,6 +10,10 @@ from ingestion.models import CleanTitle, IngestStats, UNKNOWN_VALUE, VALID_TYPES
 
 DATE_FORMAT = "%B %d, %Y"
 DURATION_RE = re.compile(r"^(?P<value>\d+)\s+(?P<unit>min|Season|Seasons)$")
+RATING_REPLACEMENTS = {
+    "NR": "Not Rated",
+    "UR": "Unrated",
+}
 
 
 
@@ -18,7 +22,7 @@ def clean_text(value: Any, *, field_name: str, stats: IngestStats) -> str | None
     if value is None:
         stats.missing_values[field_name] += 1
         return None
-    
+
     raw = str(value)
     cleaned = raw.replace("\xa0", " ")
     cleaned = cleaned.replace("\n", " ").replace("\r", " ").replace("\t", " ")
@@ -80,6 +84,7 @@ def split_list(value: str, *, field_name: str, stats: IngestStats) -> list[str]:
     return deduped_values or [UNKNOWN_VALUE]
 
 
+
 def normalize_type(value: Any, stats: IngestStats) -> str | None:
     """Normalize the title type to Movie or TV Show."""
     cleaned = clean_text(value, field_name="type", stats=stats)
@@ -95,6 +100,15 @@ def normalize_type(value: Any, stats: IngestStats) -> str | None:
 
     return normalized
 
+def normalize_rating(value: Any, stats: IngestStats) -> str:
+    """Clean rating and expand unclear rating abbreviations."""
+    rating = clean_metadata(value, field_name="rating", stats=stats)
+    normalized_rating = RATING_REPLACEMENTS.get(rating, rating)
+
+    if normalized_rating != rating:
+        stats.fixes["normalized_rating"] += 1
+
+    return normalized_rating
 
 def parse_release_year(value: Any, stats: IngestStats) -> int | None:
     """Parse release_year as an integer."""
@@ -168,7 +182,7 @@ def clean_row(row: dict[str, str], stats: IngestStats) -> CleanTitle | None:
     director_text = clean_metadata(row.get("director"), field_name="director", stats=stats)
     cast_text = clean_metadata(row.get("cast"), field_name="cast", stats=stats)
     country_text = clean_metadata(row.get("country"), field_name="country", stats=stats)
-    rating = clean_metadata(row.get("rating"), field_name="rating", stats=stats)
+    rating = normalize_rating(row.get("rating"), stats)
     genre_text = clean_metadata(row.get("listed_in"), field_name="listed_in", stats=stats)
 
     date_added = parse_date_added(row.get("date_added"), stats)
