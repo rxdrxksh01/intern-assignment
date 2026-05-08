@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 
 from rag.config import RAG_TOP_K
 from rag.llm import answer_with_groq
-from rag.retriever import TitleRetriever
+from rag.retriever import RetrievedTitle, TitleRetriever
 
 
 @dataclass
@@ -25,9 +26,32 @@ class AskResult:
     sources: list[AnswerSource]
 
 
+@lru_cache(maxsize=1)
+def get_retriever() -> TitleRetriever:
+    """Create the retriever once and reuse it across requests."""
+    return TitleRetriever()
+
+
+def select_used_sources(
+    retrieved_titles: list[RetrievedTitle],
+    used_show_ids: list[str],
+) -> list[AnswerSource]:
+    """Return only retrieved sources that the LLM said it used."""
+    title_by_id = {title.show_id: title for title in retrieved_titles}
+    sources = []
+
+    for show_id in used_show_ids:
+        title = title_by_id.get(show_id)
+
+        if title is not None:
+            sources.append(AnswerSource(show_id=title.show_id, title=title.title))
+
+    return sources
+
+
 def ask_question(question: str, top_k: int = RAG_TOP_K) -> AskResult:
-    """Retrieve relevant titles, ask Groq, and return answer with sources."""
-    retriever = TitleRetriever()
+    """Retrieve relevant titles, ask Groq, and return answer with used sources."""
+    retriever = get_retriever()
     retrieved_titles = retriever.retrieve(question, top_k=top_k)
 
     if not retrieved_titles:
@@ -36,12 +60,7 @@ def ask_question(question: str, top_k: int = RAG_TOP_K) -> AskResult:
             sources=[],
         )
 
-    answer = answer_with_groq(question, retrieved_titles)
+    llm_answer = answer_with_groq(question, retrieved_titles)
+    sources = select_used_sources(retrieved_titles, llm_answer.used_show_ids)
 
-    return AskResult(
-        answer=answer,
-        sources=[
-            AnswerSource(show_id=title.show_id, title=title.title)
-            for title in retrieved_titles
-        ],
-    )
+    return AskResult(answer=llm_answer.answer, sources=sources)
