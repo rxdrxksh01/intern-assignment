@@ -16,7 +16,7 @@ venv/
 *.db
 *.sqlite
 *.sqlite3
-data/chroma_db/
+
 
 # OS/editor files
 .DS_Store
