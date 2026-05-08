@@ -19,7 +19,7 @@ def create_schema(connection: sqlite3.Connection) -> None:
         DROP TABLE IF EXISTS titles;
 
         CREATE TABLE titles (
-            show_id TEXT PRIMARY KEY,
+            show_id TEXT NOT NULL PRIMARY KEY,
             type TEXT NOT NULL CHECK (type IN ('Movie', 'TV Show')),
             title TEXT NOT NULL,
             release_year INTEGER NOT NULL,
