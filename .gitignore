@@ -26,3 +26,6 @@ venv/
 dist/
 build/
 *.egg-info/
+# Local inspection exports
+data/*.xlsx
+data/*_preview.csv
