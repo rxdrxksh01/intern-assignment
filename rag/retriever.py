@@ -5,15 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import chromadb
-from sentence_transformers import SentenceTransformer
-
-from rag.config import (
-    CHROMA_COLLECTION_NAME,
-    CHROMA_PATH,
-    EMBEDDING_MODEL_NAME,
-    RAG_TOP_K,
-)
+from rag.config import CHROMA_COLLECTION_NAME, CHROMA_PATH, EMBEDDING_MODEL_NAME, RAG_TOP_K
 
 
 @dataclass
@@ -31,10 +23,12 @@ class TitleRetriever:
     """Chroma-backed retriever for Netflix title documents."""
 
     def __init__(self) -> None:
+        """Load Chroma and the embedding model only when retrieval is needed."""
         if not CHROMA_PATH.exists():
-            raise FileNotFoundError(
-                "Chroma index not found. Run `python -m rag.index` first."
-            )
+            raise FileNotFoundError("Chroma index not found. Run `python -m rag.index` first.")
+
+        import chromadb
+        from sentence_transformers import SentenceTransformer
 
         self.model = SentenceTransformer(EMBEDDING_MODEL_NAME)
         self.client = chromadb.PersistentClient(path=str(CHROMA_PATH))

@@ -7,7 +7,6 @@ import os
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
-from groq import Groq
 
 from rag.config import GROQ_MODEL
 from rag.retriever import RetrievedTitle
@@ -156,6 +155,8 @@ def answer_with_groq(question: str, titles: list[RetrievedTitle]) -> LLMAnswer:
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
         raise RuntimeError("GROQ_API_KEY is not set. Add it to your .env file.")
+
+    from groq import Groq
 
     client = Groq(api_key=api_key)
 
