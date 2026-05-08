@@ -257,6 +257,7 @@ def get_stats() -> StatsResponse:
             """
             SELECT country, COUNT(*) AS count
             FROM title_countries
+            WHERE country != 'Unknown'
             GROUP BY country
             ORDER BY count DESC, country
             LIMIT 10
