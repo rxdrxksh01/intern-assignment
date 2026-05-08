@@ -22,6 +22,7 @@ Rules:
 - If the sources do not support the question, say the catalogue does not contain enough information.
 - Only cite show_ids that you actually used in the answer.
 - Return valid JSON only. Do not wrap it in markdown.
+- For recommendation questions, suggest up to 4 relevant titles when the sources support them.
 """.strip()
 
 FEW_SHOT_EXAMPLES = """
