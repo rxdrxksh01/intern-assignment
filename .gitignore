@@ -16,6 +16,7 @@ venv/
 *.db
 *.sqlite
 *.sqlite3
+data/chroma_db/
 
 # OS/editor files
 .DS_Store
@@ -29,3 +30,6 @@ build/
 # Local inspection exports
 data/*.xlsx
 data/*_preview.csv
+
+# Local RAG vector index
+data/chroma_db/
