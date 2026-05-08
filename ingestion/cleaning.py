@@ -12,12 +12,13 @@ DATE_FORMAT = "%B %d, %Y"
 DURATION_RE = re.compile(r"^(?P<value>\d+)\s+(?P<unit>min|Season|Seasons)$")
 
 
+
 def clean_text(value: Any, *, field_name: str, stats: IngestStats) -> str | None:
     """Return a cleaned string, or None for missing/blank values."""
     if value is None:
         stats.missing_values[field_name] += 1
         return None
-
+    
     raw = str(value)
     cleaned = raw.replace("\xa0", " ")
     cleaned = cleaned.replace("\n", " ").replace("\r", " ").replace("\t", " ")
@@ -42,9 +43,24 @@ def clean_metadata(value: Any, *, field_name: str, stats: IngestStats) -> str:
 
     return cleaned
 
+def dedupe_preserve_order(values: list[str]) -> list[str]:
+    """Remove duplicate list values while keeping the CSV order."""
+    seen: set[str] = set()
+    deduped: list[str] = []
+
+    for value in values:
+        key = value.casefold()
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+        deduped.append(value)
+
+    return deduped
 
 def split_list(value: str, *, field_name: str, stats: IngestStats) -> list[str]:
-    """Split a comma-separated metadata field into ordered values."""
+    """Split a comma-separated metadata field into ordered unique values."""
     if value == UNKNOWN_VALUE:
         return [UNKNOWN_VALUE]
 
@@ -55,7 +71,13 @@ def split_list(value: str, *, field_name: str, stats: IngestStats) -> list[str]:
     if empty_count:
         stats.fixes[f"removed_empty_{field_name}_items"] += empty_count
 
-    return values or [UNKNOWN_VALUE]
+    deduped_values = dedupe_preserve_order(values)
+
+    removed_duplicate_count = len(values) - len(deduped_values)
+    if removed_duplicate_count:
+        stats.fixes[f"removed_duplicate_{field_name}_items"] += removed_duplicate_count
+
+    return deduped_values or [UNKNOWN_VALUE]
 
 
 def normalize_type(value: Any, stats: IngestStats) -> str | None:
