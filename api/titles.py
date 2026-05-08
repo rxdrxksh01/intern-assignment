@@ -8,7 +8,12 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from api.database import connect_database
-from api.schemas import CountryCount, PaginatedTitlesResponse, StatsResponse, TitleResponse
+from api.schemas import (
+    CountryCount,
+    PaginatedTitlesResponse,
+    StatsResponse,
+    TitleResponse,
+)
 from ingestion.models import VALID_TYPES
 
 router = APIRouter()
