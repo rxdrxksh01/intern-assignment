@@ -16,7 +16,7 @@ from rag.config import (
     RAG_BATCH_SIZE,
 )
 from rag.documents import TitleDocument, load_title_documents
-from rag.embeddings import _get_hf_client, embed_texts
+from rag.embeddings import get_hf_client, embed_texts
 
 logger = logging.getLogger(__name__)
 
@@ -44,11 +44,40 @@ def add_documents_to_collection(
     documents: list[TitleDocument],
 ) -> None:
     """Embed documents in batches and add them to Chroma."""
+    expected_dimension: int | None = None
+
     for batch_number, document_batch in enumerate(
         batched(documents, RAG_BATCH_SIZE), start=1
     ):
         texts = [document.text for document in document_batch]
         embeddings = embed_texts(hf_client, texts)
+
+        if not embeddings:
+            raise RuntimeError(f"No embeddings generated for batch {batch_number}.")
+
+        batch_dimension = len(embeddings[0])
+
+        if expected_dimension is None:
+            expected_dimension = batch_dimension
+
+            collection.modify(
+                metadata={
+                    "embedding_model": EMBEDDING_MODEL_NAME,
+                    "embedding_dimension": expected_dimension,
+                }
+            )
+
+            logger.info(
+                "Embedding metadata saved: model=%s, dimension=%d",
+                EMBEDDING_MODEL_NAME,
+                expected_dimension,
+            )
+
+        elif batch_dimension != expected_dimension:
+            raise RuntimeError(
+                f"Embedding dimension changed in batch {batch_number}: "
+                f"expected {expected_dimension}, got {batch_dimension}."
+            )
 
         collection.add(
             ids=[document.show_id for document in document_batch],
@@ -73,7 +102,7 @@ def build_index() -> None:
 
     reset_chroma_directory(CHROMA_PATH)
 
-    hf_client = _get_hf_client()
+    hf_client = get_hf_client()
     client = chromadb.PersistentClient(path=str(CHROMA_PATH))
     collection = client.get_or_create_collection(name=CHROMA_COLLECTION_NAME)
 

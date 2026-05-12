@@ -15,7 +15,7 @@ MAX_RETRIES = 3
 RETRY_DELAY_SECONDS = 2
 
 
-def _get_hf_client() -> Any:
+def get_hf_client() -> Any:
     """Create a Hugging Face InferenceClient with token validation."""
     if not HF_API_TOKEN:
         raise RuntimeError("HF_API_TOKEN is not set. Add it to your .env file.")
@@ -85,21 +85,70 @@ def _extract_single_embedding(raw: Any) -> list[float]:
 
     raise RuntimeError(f"Unexpected embedding format: {type(first_element)}")
 
+def _extract_batch_embeddings(raw: Any, *, expected_count: int) -> list[list[float]]:
+    """Extract multiple embedding vectors from HF batch output.
+
+    Possible batch shapes:
+    - [[384], [384], ...]
+    - [[[token_dim], [token_dim]], [[token_dim], [token_dim]], ...]
+
+    Each item in the outer list should belong to one input text.
+    """
+    if hasattr(raw, "tolist"):
+        raw = raw.tolist()
+
+    if not raw:
+        raise RuntimeError("Hugging Face returned an empty batch embedding.")
+
+    if expected_count == 1:
+        return [_extract_single_embedding(raw)]
+
+    if not isinstance(raw, list):
+        raise RuntimeError(f"Unexpected batch embedding format: {type(raw)}")
+
+    if len(raw) != expected_count:
+        raise RuntimeError(
+            f"Batch embedding count mismatch: expected {expected_count}, got {len(raw)}"
+        )
+
+    return [_extract_single_embedding(item) for item in raw]
+
 
 def _validate_embedding(vector: list[float], *, context: str) -> None:
     """Raise an error if the embedding is empty or invalid."""
     if not vector:
         raise RuntimeError(f"Empty embedding returned for {context}.")
 
+    if not all(math.isfinite(value) for value in vector):
+        raise RuntimeError(f"Invalid embedding values returned for {context}.")
 
-def _call_hf_api(client: Any, text: str) -> Any:
+def _validate_embedding_dimensions(embeddings: list[list[float]]) -> int:
+    """Ensure all embeddings have the same dimension and return that dimension."""
+    if not embeddings:
+        raise RuntimeError("No embeddings were generated.")
+
+    expected_dimension = len(embeddings[0])
+
+    for index, vector in enumerate(embeddings):
+        _validate_embedding(vector, context=f"text at index {index}")
+
+        if len(vector) != expected_dimension:
+            raise RuntimeError(
+                f"Dimension mismatch at index {index}: "
+                f"expected {expected_dimension}, got {len(vector)}."
+            )
+
+    return expected_dimension
+
+
+def _call_hf_api(client: Any, inputs: str | list[str]) -> Any:
     """Call the HF feature_extraction API with retry logic."""
     last_error: Exception | None = None
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             return client.feature_extraction(
-                text,
+                inputs,
                 model=EMBEDDING_MODEL_NAME,
             )
         except Exception as error:
@@ -128,24 +177,36 @@ def embed_one_text(client: Any, text: str) -> list[float]:
 def embed_texts(client: Any, texts: list[str]) -> list[list[float]]:
     """Embed multiple texts and return normalized vectors.
 
-    Embeds one text at a time for reliability — avoids HF API
-    payload size limits and inconsistent batch output shapes.
+    Tries batch embedding first for speed.
+    Falls back to one-by-one embedding if batch mode fails.
     """
+    if not texts:
+        return []
+
+    try:
+        raw_batch = _call_hf_api(client, texts)
+        embeddings = [
+            normalize_embedding(vector)
+            for vector in _extract_batch_embeddings(
+                raw_batch,
+                expected_count=len(texts),
+            )
+        ]
+
+        _validate_embedding_dimensions(embeddings)
+        return embeddings
+
+    except Exception as error:
+        logger.warning(
+            "Batch embedding failed, falling back to one-by-one mode: %s",
+            error,
+        )
+
     embeddings: list[list[float]] = []
-    expected_dimension: int | None = None
 
     for index, text in enumerate(texts):
         vector = embed_one_text(client, text)
-
-        if expected_dimension is None:
-            expected_dimension = len(vector)
-        elif len(vector) != expected_dimension:
-            raise RuntimeError(
-                f"Dimension mismatch at index {index}: "
-                f"expected {expected_dimension}, got {len(vector)}. "
-                f"Rebuild the index with `python -m rag.index`."
-            )
-
         embeddings.append(vector)
 
+    _validate_embedding_dimensions(embeddings)
     return embeddings

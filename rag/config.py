@@ -5,6 +5,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 CHROMA_PATH = Path(os.environ.get("CHROMA_PATH", "data/chroma_db"))
 CHROMA_COLLECTION_NAME = os.environ.get("CHROMA_COLLECTION_NAME", "netflix_titles")
 EMBEDDING_MODEL_NAME = os.environ.get(
