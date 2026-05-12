@@ -60,12 +60,19 @@ Create a local environment file:
 cp .env.example .env
 ```
 
-Add your Groq key in `.env`:
+Add your API keys in `.env`:
 
 ```env
 GROQ_API_KEY=your_groq_api_key_here
 GROQ_MODEL=llama-3.3-70b-versatile
+HF_API_TOKEN=your_hf_api_token_here
 ```
+
+> [!IMPORTANT]
+> **Hugging Face Token**: You need a free "Read" token from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens). This replaces local `sentence-transformers` for faster, lighter deployment.
+
+> [!WARNING]
+> **Rebuild Index**: If you previously built your index using local models, you **MUST** run `python -m rag.index` again to ensure the vector dimensions and model match.
 
 Do not commit `.env`.
 
@@ -225,10 +232,11 @@ Set these environment variables on Render:
 ```env
 GROQ_API_KEY=your_groq_api_key_here
 GROQ_MODEL=llama-3.3-70b-versatile
+HF_API_TOKEN=your_hf_api_token_here
 PYTHON_VERSION=3.11.11
 ```
 
-The RAG dependencies are lazy-loaded so the API can start quickly. The first `/ask` request after a restart can be slower because it loads the embedding model and Chroma retriever into memory.
+The RAG dependencies are lazy-loaded so the API can start quickly. The first `/ask` request after a restart can be slower because it connects to the Hugging Face Inference API and loads the Chroma retriever into memory.
 
 ---
 

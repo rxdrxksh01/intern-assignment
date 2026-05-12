@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from rag.config import CHROMA_COLLECTION_NAME, CHROMA_PATH, EMBEDDING_MODEL_NAME, RAG_TOP_K
+from rag.config import CHROMA_COLLECTION_NAME, CHROMA_PATH, RAG_TOP_K
+from rag.embeddings import _get_hf_client, embed_one_text
 
 
 @dataclass
@@ -23,23 +24,21 @@ class TitleRetriever:
     """Chroma-backed retriever for Netflix title documents."""
 
     def __init__(self) -> None:
-        """Load Chroma and the embedding model only when retrieval is needed."""
+        """Load Chroma and the HF client only when retrieval is needed."""
         if not CHROMA_PATH.exists():
-            raise FileNotFoundError("Chroma index not found. Run `python -m rag.index` first.")
+            raise FileNotFoundError(
+                "Chroma index not found. Run `python -m rag.index` first."
+            )
 
         import chromadb
-        from sentence_transformers import SentenceTransformer
 
-        self.model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+        self.hf_client = _get_hf_client()
         self.client = chromadb.PersistentClient(path=str(CHROMA_PATH))
         self.collection = self.client.get_collection(name=CHROMA_COLLECTION_NAME)
 
     def retrieve(self, question: str, top_k: int = RAG_TOP_K) -> list[RetrievedTitle]:
         """Return the most relevant catalogue titles for a question."""
-        query_embedding = self.model.encode(
-            [question],
-            normalize_embeddings=True,
-        ).tolist()[0]
+        query_embedding = embed_one_text(self.hf_client, question)
 
         result = self.collection.query(
             query_embeddings=[query_embedding],

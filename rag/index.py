@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import TypeVar
 
 import chromadb
-from sentence_transformers import SentenceTransformer
 
 from rag.config import (
     CHROMA_COLLECTION_NAME,
@@ -17,6 +16,7 @@ from rag.config import (
     RAG_BATCH_SIZE,
 )
 from rag.documents import TitleDocument, load_title_documents
+from rag.embeddings import _get_hf_client, embed_texts
 
 logger = logging.getLogger(__name__)
 
@@ -40,19 +40,25 @@ def batched(items: list[T], batch_size: int) -> list[list[T]]:
 
 def add_documents_to_collection(
     collection: chromadb.Collection,
-    model: SentenceTransformer,
+    hf_client: object,
     documents: list[TitleDocument],
 ) -> None:
     """Embed documents in batches and add them to Chroma."""
-    for document_batch in batched(documents, RAG_BATCH_SIZE):
+    for batch_number, document_batch in enumerate(
+        batched(documents, RAG_BATCH_SIZE), start=1
+    ):
         texts = [document.text for document in document_batch]
-        embeddings = model.encode(texts, normalize_embeddings=True).tolist()
+        embeddings = embed_texts(hf_client, texts)
 
         collection.add(
             ids=[document.show_id for document in document_batch],
             documents=texts,
             metadatas=[document.metadata for document in document_batch],
             embeddings=embeddings,
+        )
+
+        logger.info(
+            "Batch %d indexed (%d documents)", batch_number, len(document_batch)
         )
 
 
@@ -67,11 +73,11 @@ def build_index() -> None:
 
     reset_chroma_directory(CHROMA_PATH)
 
-    model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+    hf_client = _get_hf_client()
     client = chromadb.PersistentClient(path=str(CHROMA_PATH))
     collection = client.get_or_create_collection(name=CHROMA_COLLECTION_NAME)
 
-    add_documents_to_collection(collection, model, documents)
+    add_documents_to_collection(collection, hf_client, documents)
 
     logger.info("RAG index built")
     logger.info("Documents indexed: %s", len(documents))
