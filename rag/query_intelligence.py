@@ -101,8 +101,9 @@ Domain understanding:
 - "docuseries" means genre "Docuseries".
 
 Year handling:
-- "after 2018" means {"release_year": {"$gte": 2018}}
+- "after 2018" means {"release_year": {"$gt": 2018}}
 - "from 2018" means {"release_year": {"$gte": 2018}}
+- "since 2018" means {"release_year": {"$gte": 2018}}
 - "before 2020" means {"release_year": {"$lte": 2020}}
 - "between 2017 and 2020" means {"release_year": {"$gte": 2017, "$lte": 2020}}
 - "in 2019" means {"release_year": {"$eq": 2019}}
@@ -130,7 +131,7 @@ Correct JSON:
       {"countries": {"$contains": "India"}},
       {"genres": {"$contains": "Comedies"}},
       {"type": "Movie"},
-      {"release_year": {"$gte": 2018}}
+      {"release_year": {"$gt": 2018}}
     ]
   }
 }
