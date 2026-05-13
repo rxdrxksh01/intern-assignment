@@ -15,7 +15,7 @@ class TitleDocument:
     show_id: str
     title: str
     text: str
-    metadata: dict[str, str | int | None]
+    metadata: dict[str, str | int | float | bool | list[str] | None]
 
 
 def fetch_child_values(
@@ -67,6 +67,10 @@ def build_document_text(
 
     return "\n".join(parts)
 
+def ensure_non_empty_metadata_list(values: list[str]) -> list[str]:
+    """Return a non-empty metadata list for Chroma filters."""
+    clean_values = [value.strip() for value in values if value.strip()]
+    return clean_values or ["Unknown"]
 
 def load_title_documents() -> list[TitleDocument]:
     """Load all cleaned titles from SQLite and convert them to RAG documents."""
@@ -116,6 +120,8 @@ def load_title_documents() -> list[TitleDocument]:
                 cast=cast,
                 directors=directors,
             )
+            metadata_countries = ensure_non_empty_metadata_list(countries)
+            metadata_genres = ensure_non_empty_metadata_list(genres)
 
             documents.append(
                 TitleDocument(
@@ -128,8 +134,8 @@ def load_title_documents() -> list[TitleDocument]:
                         "type": str(row["type"]),
                         "release_year": int(row["release_year"]),
                         "rating": str(row["rating"]),
-                        "countries": ", ".join(countries),
-                        "genres": ", ".join(genres),
+                        "countries": metadata_countries,
+                        "genres": metadata_genres,
                     },
                 )
             )

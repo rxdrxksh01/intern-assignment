@@ -8,6 +8,7 @@ from functools import lru_cache
 from rag.config import RAG_TOP_K
 from rag.llm import answer_with_groq
 from rag.retriever import RetrievedTitle, TitleRetriever
+from rag.query_intelligence import create_search_plan
 
 
 @dataclass
@@ -50,13 +51,20 @@ def select_used_sources(
 
 
 def ask_question(question: str, top_k: int = RAG_TOP_K) -> AskResult:
-    """Retrieve relevant titles, ask Groq, and return answer with used sources."""
+    """Plan retrieval, retrieve relevant titles, ask Groq, and return answer."""
     retriever = get_retriever()
-    retrieved_titles = retriever.retrieve(question, top_k=top_k)
+
+    search_plan = create_search_plan(question)
+
+    retrieved_titles = retriever.retrieve(
+        search_plan.semantic_query,
+        top_k=top_k,
+        where_filter=search_plan.where,
+    )
 
     if not retrieved_titles:
         return AskResult(
-            answer="I could not find relevant titles in the provided catalogue.",
+            answer="I could not find matching titles in the provided catalogue.",
             sources=[],
         )
 
