@@ -71,35 +71,45 @@ class TitleRetriever:
                 "Rebuild the index with `python -m rag.index`."
             )
 
-    def retrieve(self, question: str, top_k: int = RAG_TOP_K) -> list[RetrievedTitle]:
-        """Return the most relevant catalogue titles for a question."""
-        query_embedding = embed_one_text(self.hf_client, question)
-        self._validate_query_embedding_dimension(query_embedding)
+    def retrieve(
+        self,
+        question: str,
+        top_k: int = RAG_TOP_K,
+        where_filter: dict[str, Any] | None = None,
+    ) -> list[RetrievedTitle]:
+            """Return the most relevant catalogue titles for a question."""
+            query_embedding = embed_one_text(self.hf_client, question)
+            self._validate_query_embedding_dimension(query_embedding)
 
-        result = self.collection.query(
-            query_embeddings=[query_embedding],
-            n_results=top_k,
-            include=["documents", "metadatas", "distances"],
-        )
+            query_args: dict[str, Any] = {
+                "query_embeddings": [query_embedding],
+                "n_results": top_k,
+                "include": ["documents", "metadatas", "distances"],
+            }
 
-        ids = result["ids"][0]
-        documents = result["documents"][0]
-        metadatas = result["metadatas"][0]
-        distances = result["distances"][0]
+            if where_filter:
+                query_args["where"] = where_filter
 
-        return [
-            RetrievedTitle(
-                show_id=str(item_id),
-                title=str(metadata.get("title", "")),
-                text=str(document),
-                metadata=dict(metadata),
-                distance=float(distance),
-            )
-            for item_id, document, metadata, distance in zip(
-                ids,
-                documents,
-                metadatas,
-                distances,
-                strict=True,
-            )
-        ]
+            result = self.collection.query(**query_args)
+
+            ids = result["ids"][0]
+            documents = result["documents"][0]
+            metadatas = result["metadatas"][0]
+            distances = result["distances"][0]
+
+            return [
+                RetrievedTitle(
+                    show_id=str(item_id),
+                    title=str(metadata.get("title", "")),
+                    text=str(document),
+                    metadata=dict(metadata),
+                    distance=float(distance),
+                )
+                for item_id, document, metadata, distance in zip(
+                    ids,
+                    documents,
+                    metadatas,
+                    distances,
+                    strict=True,
+                )
+            ]
