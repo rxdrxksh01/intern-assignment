@@ -82,6 +82,23 @@ Use these exact field names:
 - "countries", not "country"
 - "genres", not "genre"
 
+Semantic query rewriting rules:
+- The semantic_query should NOT simply copy the user query.
+- The semantic_query should be a richer meaning-based search phrase for vector search.
+- Remove strict filters from semantic_query when they are already represented in where.
+- Do not include country, year, rating, or type words in semantic_query if they are already in where.
+- Expand vague user intent into useful catalogue/search language.
+- Keep semantic_query focused on story, mood, theme, tone, genre feel, or recommendation intent.
+
+Examples:
+- "light heart movie" → "lighthearted feel-good entertaining comedy drama"
+- "something emotional" → "emotional heartfelt family relationship drama"
+- "dark crime show" → "dark crime investigation thriller"
+- "romantic feel good movie" → "romantic feel-good heartwarming story"
+- "scary movie" → "horror suspense scary thriller"
+- "motivational movie" → "inspiring motivational uplifting story"
+- "family friendly movie" → "family friendly wholesome lighthearted story"
+
 Domain understanding:
 - "Bollywood", "desi", "Indian" means countries contains "India".
 - "American", "US", "USA" means countries contains "United States".
@@ -117,6 +134,8 @@ Before returning JSON, silently self-check:
 6. Does "where" use "countries" and "genres" with "$contains"?
 7. Did you avoid unsupported fields like "country", "genre", "title", "cast", or "director"?
 8. If multiple filters are needed, did you wrap them inside "$and"?
+9. Did you remove country, type, and year words from semantic_query if they are already represented in where?
+10. Did you enrich vague mood words into better semantic search language?
 
 Examples:
 
@@ -125,7 +144,7 @@ Suggest Bollywood comedy movies after 2018
 
 Correct JSON:
 {
-  "semantic_query": "comedy movies",
+  "semantic_query": "funny lighthearted entertaining comedy movies",
   "where": {
     "$and": [
       {"countries": {"$contains": "India"}},
@@ -141,7 +160,7 @@ Suggest Korean romantic shows
 
 Correct JSON:
 {
-  "semantic_query": "romantic shows",
+  "semantic_query": "romantic heartfelt relationship drama shows",
   "where": {
     "$and": [
       {"countries": {"$contains": "South Korea"}},
@@ -156,7 +175,7 @@ Find American documentaries before 2020
 
 Correct JSON:
 {
-  "semantic_query": "documentaries",
+  "semantic_query": "informative real-life documentary stories",
   "where": {
     "$and": [
       {"countries": {"$contains": "United States"}},
@@ -171,7 +190,7 @@ Suggest Indian or Korean dramas
 
 Correct JSON:
 {
-  "semantic_query": "dramas",
+  "semantic_query": "emotional dramatic character-driven stories",
   "where": {
     "$and": [
       {
@@ -186,12 +205,53 @@ Correct JSON:
 }
 
 User:
+I want light heart movie of India after 2018
+
+Correct JSON:
+{
+  "semantic_query": "lighthearted feel-good entertaining comedy drama",
+  "where": {
+    "$and": [
+      {"countries": {"$contains": "India"}},
+      {"type": "Movie"},
+      {"release_year": {"$gt": 2018}}
+    ]
+  }
+}
+
+User:
 Suggest emotional family stories
 
 Correct JSON:
 {
-  "semantic_query": "emotional family stories",
+  "semantic_query": "emotional heartfelt family relationship stories",
   "where": null
+}
+
+User:
+Suggest dark crime investigation shows
+
+Correct JSON:
+{
+  "semantic_query": "dark crime investigation suspense thriller series",
+  "where": {
+    "$and": [
+      {"type": "TV Show"}
+    ]
+  }
+}
+
+User:
+Suggest family friendly movies
+
+Correct JSON:
+{
+  "semantic_query": "family friendly wholesome lighthearted feel-good story",
+  "where": {
+    "$and": [
+      {"type": "Movie"}
+    ]
+  }
 }
 """.strip()
 
