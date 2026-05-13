@@ -11,6 +11,7 @@ from rag.retriever import RetrievedTitle, TitleRetriever
 from rag.query_intelligence import create_search_plan
 
 
+
 @dataclass
 class AnswerSource:
     """A source title used in a RAG answer."""
